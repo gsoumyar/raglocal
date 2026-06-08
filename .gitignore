@@ -1,10 +1,28 @@
-__pycache__/
-chroma_db/
+# Virtual environment
+.venv/
 venv/
-test.txt
+
+# Auto-generated data stores
+chroma_db/
+sparse_store.json
+eval_results.json
+parent_store/
+
+# Parser test outputs
+out_docling.md
+out_pymupdf.txt
+
+# Python cache
+__pycache__/
 *.pyc
+
+# PDFs
+*.pdf
+
+# Environment and OS
 .env
 .DS_Store
-parent_store/
 .claude/
-requirements.txt
+
+# Old test files
+test.txt

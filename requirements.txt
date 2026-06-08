@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+pydantic
+PyMuPDF
+chromadb
+docling
+FlagEmbedding
+transformers
+torch
+requests

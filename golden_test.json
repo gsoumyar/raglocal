@@ -1,0 +1,42 @@
+[
+    {
+        "question": "What is a Pozidriv screwdriver?",
+        "ground_truth": "Similar to Phillips but with additional ribs between the arms. Common in European-made furniture and equipment."
+    },
+    {
+        "question": "What types of striking tools are there?",
+        "ground_truth": "Claw hammer, ball-peen hammer, sledgehammer, rubber mallet, dead blow hammer, tack hammer, and chisels."
+    },
+    {
+        "question": "What does a torque wrench do?",
+        "ground_truth": "Tightens fasteners to a specific torque value measured in foot-pounds or Newton-meters. Critical in automotive work and engine assembly."
+    },
+    {
+        "question": "What is the difference between a spade and a shovel?",
+        "ground_truth": "A spade has a flat blade with a straight edge for digging and edging. A shovel has a curved, pointed blade better for scooping and moving loose material."
+    },
+    {
+        "question": "What does an OBD-II scanner do?",
+        "ground_truth": "Plugs into a car's diagnostic port and reads error codes from the engine, transmission, and other systems."
+    },
+    {
+        "question": "What is a PCR machine used for?",
+        "ground_truth": "Amplifies small segments of DNA through repeated heating and cooling cycles. Used in genetic testing, forensics, and medical diagnostics."
+    },
+    {
+        "question": "How does a dead blow hammer work?",
+        "ground_truth": "Filled with sand or shot inside the head to eliminate rebound. Provides maximum force transfer. Used in automotive repair and assembly work."
+    },
+    {
+        "question": "What cutting tools are used for metal?",
+        "ground_truth": "Hacksaw for cutting metal, pipe, and plastic. Tin snips for cutting sheet metal. Bolt cutters for cutting bolts, chains, and wire mesh."
+    },
+    {
+        "question": "What is a spectrophotometer?",
+        "ground_truth": "Measures how much light a substance absorbs at different wavelengths. Used to identify chemical compounds, measure concentrations, and analyze materials."
+    },
+    {
+        "question": "What safety warning is given about chainsaws?",
+        "ground_truth": "One of the most dangerous tools, requires proper training and protective equipment."
+    }
+]
