@@ -1,13 +1,14 @@
 # Local-First RAG Learning Assistant
 
-A fully offline document question-answering system. Upload a PDF textbook, ask questions, get cited answers grounded in the source material. Nothing leaves your machine.
+A fully offline document intelligence system. Upload a PDF, ask questions, or start an adaptive teaching session grounded in the document. Nothing leaves your machine.
 
-Every layer uses best-in-class methods: structure-preserving parsing (Docling), heading-aware chunking with table protection, hybrid dense+sparse retrieval (BGE-M3), cross-encoder reranking, and local LLM generation (Ollama + Llama 3.2). Every answer cites the exact section it came from.
+Every layer uses best-in-class methods: structure-preserving parsing (Docling), heading-aware chunking with table protection, hybrid dense+sparse retrieval (BGE-M3), cross-encoder reranking, local LLM generation (Ollama + Llama 3.2), and a LangGraph teaching agent that adapts to the learner. Every answer cites the exact section it came from.
 
 ---
 
 ## Demo
 
+**Ask mode**
 ```
 >> Upload: tools.pdf (16 pages)
    32 chunks extracted, 5468 words
@@ -17,7 +18,21 @@ Every layer uses best-in-class methods: structure-preserving parsing (Docling), 
    A Pozidriv screwdriver is similar to Phillips but with additional
    ribs between the arms. Common in European-made furniture and equipment.
 
-   Source: tools.pdf, Section 1.2 Fastening and Turning Tools
+   Source: tools.pdf › 1.2 Fastening and Turning Tools
+```
+
+**Teach mode**
+```
+>> Topic: Phillips screwdriver | Level: beginner | Style: example
+
+   Agent: Let me show you with an example. Imagine you're assembling
+   flat-pack furniture — every screw has a cross-shaped slot. That slot
+   was designed for a Phillips screwdriver...
+
+>> Learner: got it, lets jump to Pozidriv screwdrivers
+
+   Agent: [NEW_TOPIC detected] A Pozidriv looks like a Phillips at first
+   glance, but has a second set of ribs between the arms...
 ```
 
 The system never guesses. If the answer is not in the document, it says so.
@@ -25,6 +40,8 @@ The system never guesses. If the answer is not in the document, it says so.
 ---
 
 ## Architecture
+
+### RAG Pipeline
 
 ```
 PDF Upload
@@ -67,6 +84,36 @@ Ollama + Llama 3.2 3B ..... generates cited answer, fully local
 Answer + Citations ......... filename + section path for every source
 ```
 
+### Teaching Agent (LangGraph)
+
+```
+/teach/start  {topic, level, pace, strategy}
+    |
+    v
+retrieve ................... BGE-M3 + hybrid search + reranker → top chunks
+    |
+    v
+plan ....................... choose strategy (example / analogy / definition)
+    |                        rotates on re-explain, honors learner requests
+    v
+generate ................... Llama reads chunks + learner profile + history
+    |                        builds on prior explanation, never repeats
+    v
+[interrupt — wait for learner reply]
+    |
+    v
+classify_intent ............ Llama classifies reply into one of five labels:
+    |                        GOT_IT / CONFUSED / WANT_STRATEGY /
+    |                        WORD_QUESTION / NEW_TOPIC
+    v
+route
+    |-- GOT_IT        → end session
+    |-- CONFUSED      → plan (new strategy) → generate
+    |-- WANT_STRATEGY → plan (honor request) → generate
+    |-- WORD_QUESTION → clarify word → generate (continue)
+    |-- NEW_TOPIC     → retrieve (fresh topic) → plan → generate
+```
+
 ---
 
 ## Why Each Piece Exists
@@ -81,6 +128,7 @@ Answer + Citations ......... filename + section path for every source
 | Hybrid search | Merges semantic (dense) and keyword (sparse) signals | Rare terms diluted in dense embeddings, exact matches lost |
 | Reranker | Reads question and chunk side by side as a pair | Embedding comparison misses negation, qualifiers, subtle distinctions |
 | Ollama + Llama 3.2 | Fully local generation, zero external API calls | Sensitive data (medical, financial, academic) would leave the machine |
+| LangGraph | Stateful multi-turn agent with conditional routing | A chain runs once — can't loop, adapt strategy, or handle five intents |
 | RAGAS evaluation | Automated scoring of faithfulness, relevancy, correctness | No way to measure if a change helped or hurt |
 
 ---
@@ -100,7 +148,7 @@ Baseline results on a 16-page tools reference document, 10 golden questions:
 | Contextual Retrieval OFF | 1.00 | 0.75 | 0.71 |
 | Contextual Retrieval ON | 1.00 | 0.80 | 0.77 |
 
-Zero hallucination across all configurations. Contextual Retrieval improved relevancy and correctness with no loss in faithfulness. The toggle exists because CR adds ingestion time and the benefit varies by document structure.
+Zero hallucination across all configurations. Contextual Retrieval improved relevancy and correctness with no loss in faithfulness.
 
 ---
 
@@ -115,8 +163,8 @@ Zero hallucination across all configurations. Contextual Retrieval improved rele
 ### Install
 
 ```bash
-git clone https://github.com/gsoumyar/rag-document-assistant-langchain.git
-cd rag-document-assistant-langchain
+git clone git@github.com:gsoumyar/raglocal.git
+cd raglocal
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -125,26 +173,25 @@ pip install -r requirements.txt
 ### Run
 
 ```bash
-# Ensure Ollama is running (open the app or run: ollama serve)
+# Terminal 1 — API (ensure Ollama is running first)
 uvicorn main:app
 ```
 
-### Test
-
 ```bash
-# Unit tests — no models or Ollama required, runs in under a second
-pytest tests/
+# Terminal 2 — Streamlit UI
+streamlit run teach_app.py
 ```
 
-> **Note:** Do not use `--reload`. Docling and HuggingFace write cache files into `.venv` during model loading, which triggers WatchFiles to restart the server in a loop. Use plain `uvicorn main:app`.
+> **Note:** Do not use `--reload` with uvicorn. Docling and HuggingFace write cache files into `.venv` during model loading, which triggers WatchFiles to restart the server in a loop.
 
 ### Usage
 
-1. Open `http://127.0.0.1:8000/docs` (Swagger UI)
-2. **POST /upload** with a PDF file. Toggle `contextual_retrieval=true` for richer chunk embeddings (slower ingestion, better retrieval on documents with vague headings).
-3. **POST /ask** with a question. Response includes the answer, source citations, and raw retrieved context.
-4. **GET /inspect** to view all stored chunks and their section metadata.
-5. **DELETE /clear** to wipe all stored data.
+**Streamlit UI** (recommended): open `http://localhost:8501`
+1. Upload a PDF in the sidebar
+2. Use the **ASK** tab to ask questions and get cited answers
+3. Use the **TEACH** tab to start an adaptive learning session — set your topic, level, pace, and explanation style
+
+**Swagger UI**: open `http://127.0.0.1:8000/docs`
 
 ### Evaluate
 
@@ -162,36 +209,34 @@ Results append to `eval_results.json` for comparison across configurations.
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/upload` | Upload a PDF. Query param: `contextual_retrieval` (bool, default false) |
-| POST | `/ask` | Ask a question. Returns: answer, sources, retrieved_context |
+| POST | `/ask` | Ask a question. Body: `{"text": "..."}`. Returns: answer, sources, retrieved_context |
+| POST | `/teach/start` | Start a teaching session. Body: `{"topic", "level", "pace", "strategy"}`. Returns: thread_id, message, sources |
+| POST | `/teach/reply` | Continue a session. Body: `{"thread_id", "reply"}`. Returns: intent, message, sources, done |
 | GET | `/inspect` | List all stored chunks, sections, and metadata |
 | DELETE | `/clear` | Wipe ChromaDB and sparse store |
 | GET | `/` | Health check |
 | GET | `/about` | Project info |
-| GET | `/ui` | Simple web UI |
 
 ---
 
 ## Project Structure
 
 ```
-rag-document-assistant-langchain/
-    main.py                 FastAPI app, full RAG pipeline
-    utils.py                Pure helper functions (chunking, scoring, context)
+raglocal/
+    main.py                 FastAPI app — RAG pipeline + LangGraph teaching agent
+    teach_app.py            Streamlit UI — sidebar upload, ASK tab, TEACH tab
     eval_ragas.py           RAGAS evaluation harness
     golden_test.json        10 question-answer pairs for evaluation
     requirements.txt        Python dependencies
-    static/
-        index.html          Web UI
-    tests/
-        test_chunking.py    Pytest unit tests (no model deps, fast)
-    scripts/
-        parse_test.py       Standalone: Docling vs PyMuPDF comparison
-        bge_test.py         Standalone: BGE-M3 embedding validation
-        ollama_test.py      Standalone: Ollama connection test
-        rerank_test.py      Standalone: reranker validation
-    chroma_db/              ChromaDB storage (auto-generated, gitignored)
-    sparse_store.json       Sparse vectors (auto-generated, gitignored)
-    eval_results.json       Evaluation history (auto-generated, gitignored)
+    utils.py                Chunker, context helpers, hybrid scoring
+    parse_test.py           Standalone: Docling vs PyMuPDF comparison
+    bge_test.py             Standalone: BGE-M3 embedding validation
+    ollama_test.py          Standalone: Ollama connection test
+    rerank_test.py          Standalone: reranker validation
+    static/                 Simple web UI
+    chroma_db/              ChromaDB storage (auto-generated)
+    sparse_store.json       Sparse vectors (auto-generated)
+    eval_results.json       Evaluation history (auto-generated)
 ```
 
 ---
@@ -200,7 +245,7 @@ rag-document-assistant-langchain/
 
 - **Single document at a time.** Each upload clears previous data. Deliberate tradeoff: avoids schema conflicts and stale embeddings at the cost of cross-document search.
 
-- **Text-layer PDFs only.** OCR is disabled. Scanned documents produce empty output. OCR can be enabled via config but adds significant processing time and memory.
+- **Text-layer PDFs only.** OCR is disabled. Scanned documents produce empty output.
 
 - **Same model as judge.** RAGAS evaluation uses Llama 3.2 as both generator and judge. Relative comparisons between configurations are reliable; absolute scores are softer than they would be with an independent stronger judge.
 
@@ -213,23 +258,6 @@ rag-document-assistant-langchain/
 ---
 
 ## Roadmap
-
-### Next
-
-**Agentic Teaching Flow (LangGraph).** Replace the single question-answer loop with a multi-step teaching agent:
-- Assess what the learner already knows
-- Retrieve relevant content
-- Plan an explanation strategy (analogy-first, definition-first, example-first)
-- Generate the explanation
-- Check understanding ("can you explain this back to me?")
-- Re-explain with a different angle if the learner is stuck
-- Advance to the next concept when they've got it
-
-This is the difference between a search engine and a tutor.
-
-**Streamlit UI.** File upload with progress bar, chat-style Q&A, visible citations with section references, toggle controls. Built after the teaching agent since the agent changes what the interface needs to show.
-
-### Later
 
 **Stronger evaluation.** RAGAS with a 7B+ judge model for more reliable absolute scores. Context precision and context recall metrics alongside faithfulness, relevancy, and correctness.
 
@@ -252,5 +280,7 @@ This is the difference between a search engine and a tutor.
 | Sparse Store | JSON (persisted to disk, loaded at startup) |
 | Reranker | BAAI/bge-reranker-v2-m3 (cross-encoder) |
 | LLM | Ollama + Llama 3.2 3B |
+| Teaching Agent | LangGraph (stateful multi-turn, five-intent router) |
 | Backend | FastAPI |
+| UI | Streamlit |
 | Evaluation | Custom RAGAS harness (local Llama as judge) |
